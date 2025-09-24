@@ -29,7 +29,7 @@ export default function AssessmentRunner() {
       <header className="bg-white shadow-sm border-b">
         <div className="px-6 py-4">
           <h1 className="text-2xl font-bold text-gray-900">
-            Compass Assessment Runner
+            Compass Assessment Module 2
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Start or resume a journey, answer questions, and continue the loop
@@ -80,6 +80,7 @@ export default function AssessmentRunner() {
                     setIsLoading={setIsLoading}
                   />
                 </div>
+                
               )}
             </div>
 

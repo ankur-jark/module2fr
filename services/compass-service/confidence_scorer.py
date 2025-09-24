@@ -2,7 +2,6 @@ from typing import List, Dict, Tuple
 import numpy as np
 from compass_schemas import (
     ConfidenceScore,
-    RIASECConfidence,
     ResponseAnalysis,
     UserResponse,
     JourneyState
@@ -15,9 +14,6 @@ class ConfidenceScorerService:
         self.recent_weight_factor = 1.2
         
     def calculate_confidence(self, journey_state: JourneyState) -> ConfidenceScore:
-        # Calculate RIASEC confidence
-        riasec_confidence = self._calculate_riasec_confidence(journey_state.analyses)
-        
         # Calculate motivator confidence
         motivator_confidence = self._calculate_motivator_confidence(journey_state.analyses)
         
@@ -29,7 +25,6 @@ class ConfidenceScorerService:
         
         # Calculate overall confidence
         overall_confidence = self._calculate_overall_confidence(
-            riasec_confidence,
             motivator_confidence, 
             interest_confidence,
             skip_adjustment
@@ -43,57 +38,16 @@ class ConfidenceScorerService:
         
         # Identify remaining gaps
         gaps_remaining = self._identify_gaps(
-            riasec_confidence,
             motivator_confidence,
             interest_confidence
         )
         
         return ConfidenceScore(
-            riasec_confidence=riasec_confidence,
             motivator_confidence=motivator_confidence,
             interest_confidence=interest_confidence,
             overall_confidence=overall_confidence,
             ready_to_complete=ready_to_complete,
             gaps_remaining=gaps_remaining
-        )
-    
-    def _calculate_riasec_confidence(self, analyses: List[ResponseAnalysis]) -> RIASECConfidence:
-        dimensions = ['realistic', 'investigative', 'artistic', 'social', 'enterprising', 'conventional']
-        confidence_scores = {}
-        
-        for dimension in dimensions:
-            signals = []
-            weights = []
-            
-            for i, analysis in enumerate(analyses):
-                if dimension in analysis.riasec_signals:
-                    signal = analysis.riasec_signals[dimension]
-                    signals.append(signal['confidence'])
-                    # More recent responses get higher weight
-                    weight = 1.0 + (i / len(analyses)) * 0.5
-                    weights.append(weight)
-            
-            if signals:
-                # Weighted average with consideration for signal count
-                weighted_avg = np.average(signals, weights=weights)
-                signal_count_bonus = min(len(signals) * 5, 20)  # Max 20% bonus for multiple signals
-                confidence = min(weighted_avg + signal_count_bonus, 100)
-                
-                # Penalize if too few signals
-                if len(signals) < self.min_signals_for_confidence:
-                    confidence *= (len(signals) / self.min_signals_for_confidence)
-            else:
-                confidence = 0.0
-                
-            confidence_scores[dimension] = confidence
-        
-        return RIASECConfidence(
-            realistic=confidence_scores['realistic'],
-            investigative=confidence_scores['investigative'],
-            artistic=confidence_scores['artistic'],
-            social=confidence_scores['social'],
-            enterprising=confidence_scores['enterprising'],
-            conventional=confidence_scores['conventional']
         )
     
     def _calculate_motivator_confidence(self, analyses: List[ResponseAnalysis]) -> float:
@@ -189,23 +143,12 @@ class ConfidenceScorerService:
     
     def _calculate_overall_confidence(
         self,
-        riasec: RIASECConfidence,
         motivator: float,
         interest: float,
         skip_adjustment: float
     ) -> float:
-        # Average RIASEC confidence
-        riasec_avg = np.mean([
-            riasec.realistic,
-            riasec.investigative,
-            riasec.artistic,
-            riasec.social,
-            riasec.enterprising,
-            riasec.conventional
-        ])
-        
-        # Weighted average (RIASEC is most important)
-        base_confidence = (riasec_avg * 0.5) + (motivator * 0.3) + (interest * 0.2)
+        # Weighted average (motivators slightly more important than interests)
+        base_confidence = (motivator * 0.6) + (interest * 0.4)
         
         # Apply skip adjustment
         adjusted_confidence = max(0, base_confidence + skip_adjustment)
@@ -225,25 +168,10 @@ class ConfidenceScorerService:
     
     def _identify_gaps(
         self,
-        riasec: RIASECConfidence,
         motivator_confidence: float,
         interest_confidence: float
     ) -> List[str]:
         gaps = []
-        
-        # Check RIASEC dimensions
-        riasec_scores = {
-            'Realistic': riasec.realistic,
-            'Investigative': riasec.investigative,
-            'Artistic': riasec.artistic,
-            'Social': riasec.social,
-            'Enterprising': riasec.enterprising,
-            'Conventional': riasec.conventional
-        }
-        
-        for dimension, score in riasec_scores.items():
-            if score < 60:
-                gaps.append(f"{dimension} dimension (confidence: {score:.0f}%)")
         
         # Check motivators
         if motivator_confidence < 70:

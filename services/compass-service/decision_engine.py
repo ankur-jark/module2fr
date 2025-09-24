@@ -156,19 +156,7 @@ class DecisionEngineService:
         primary_gap = confidence_score.gaps_remaining[0]
         
         # Make it more conversational
-        if "Realistic" in primary_gap:
-            return "Understanding hands-on and practical interests"
-        elif "Investigative" in primary_gap:
-            return "Exploring analytical and research interests"
-        elif "Artistic" in primary_gap:
-            return "Discovering creative and expressive preferences"
-        elif "Social" in primary_gap:
-            return "Understanding interpersonal and helping motivations"
-        elif "Enterprising" in primary_gap:
-            return "Exploring leadership and business interests"
-        elif "Conventional" in primary_gap:
-            return "Understanding organizational and structured work preferences"
-        elif "motivators" in primary_gap.lower():
+        if "motivators" in primary_gap.lower():
             return "Identifying key career drivers and values"
         elif "interests" in primary_gap.lower():
             return "Discovering specific areas of enthusiasm"

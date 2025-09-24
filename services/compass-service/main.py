@@ -22,7 +22,6 @@ from compass_schemas import (
     GeneratedQuestion,
     JourneyDecision,
     CompletedProfile,
-    RIASECScore,
     ConfidenceScore
 )
 from compass_orchestrator import CompassOrchestrator
@@ -83,7 +82,7 @@ async def health_check():
         "status": "healthy",
         "service": "compass-service",
         "version": "1.0.0",
-        "capabilities": ["riasec", "motivators", "interests"]
+        "capabilities": ["motivators", "interests"]
     }
 
 # Journey Management
@@ -157,7 +156,6 @@ class ResponseSubmission(BaseModel):
     skipped: bool = False
 
 class ProfileUpdateRequest(BaseModel):
-    current_profile: Optional[RIASECScore] = None
     current_confidence: Optional[ConfidenceScore] = None
     reason: Optional[str] = None  # Why the user is updating
 
@@ -246,10 +244,6 @@ async def update_journey_profile(
         if not journey_state:
             raise HTTPException(status_code=404, detail="Journey not found")
         
-        # Update profile if provided
-        if update_data.current_profile:
-            journey_state.current_profile = update_data.current_profile
-        
         # Update confidence if provided
         if update_data.current_confidence:
             journey_state.current_confidence = update_data.current_confidence
@@ -268,7 +262,6 @@ async def update_journey_profile(
             "journey_id": journey_id,
             "reason": update_data.reason,
             "updated_fields": {
-                "profile_updated": update_data.current_profile is not None,
                 "confidence_updated": update_data.current_confidence is not None
             }
         })
@@ -296,8 +289,6 @@ async def _publish_profile_component(
         service_origin="compass-service",
         confidence=profile.confidence_at_completion,
         data={
-            "riasec_profile": profile.riasec_profile.model_dump(),
-            "riasec_code": profile.riasec_code,
             "motivators": profile.motivators,
             "interests": profile.interests,
             "insights": profile.insights.model_dump()

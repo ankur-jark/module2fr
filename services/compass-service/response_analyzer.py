@@ -60,38 +60,20 @@ User Selected: Option {response_text.strip().upper()}
 
 Based on the option they selected from the scenario, extract signals for:
 
-1. RIASEC Dimensions (rate 0-10 for strength, 0-100 for confidence):
-   - Realistic: hands-on, practical, physical activities, tools, outdoors
-   - Investigative: analytical, intellectual, research, problem-solving, science
-   - Artistic: creative, expressive, innovative, design, unstructured
-   - Social: helping, teaching, collaborating, interpersonal, service
-   - Enterprising: leading, persuading, business, sales, risk-taking
-   - Conventional: organizing, structured, detail-oriented, procedures, data
-
-2. Career Motivators (identify any clearly present):
+1. Career Motivators (identify any clearly present from this list):
    {', '.join(self.motivator_types)}
 
-3. Interests: Specific activities, subjects, skills, or domains mentioned
+   - For each motivator found, provide: type, strength (1-10), and a brief evidence quote.
 
-Analyze both explicit statements and implicit indicators. Look for:
-- Direct preferences stated
-- Emotional language indicating enthusiasm or aversion
-- Examples or stories that reveal values
-- Problem-solving approaches mentioned
-- Work style preferences implied
+2. Interests: Specific activities, subjects, skills, or domains implied by the option
+   - For each interest, provide: category, specific (short phrase), and enthusiasm (1-10).
+
+Consider both explicit context and implicit indicators from the selected option.
 
 Output as JSON:
 {{
-  "riasec": {{
-    "realistic": {{"score": 0-10, "confidence": 0-100, "evidence": "quote from response"}},
-    "investigative": {{"score": 0-10, "confidence": 0-100, "evidence": "quote"}},
-    "artistic": {{"score": 0-10, "confidence": 0-100, "evidence": "quote"}},
-    "social": {{"score": 0-10, "confidence": 0-100, "evidence": "quote"}},
-    "enterprising": {{"score": 0-10, "confidence": 0-100, "evidence": "quote"}},
-    "conventional": {{"score": 0-10, "confidence": 0-100, "evidence": "quote"}}
-  }},
   "motivators": [
-    {{"type": "motivator name", "strength": 1-10, "evidence": "quote"}}
+    {{"type": "motivator name", "strength": 1-10, "evidence": "short quote"}}
   ],
   "interests": [
     {{"category": "technology/arts/business/science/etc", "specific": "detailed interest", "enthusiasm": 1-10}}
@@ -99,11 +81,11 @@ Output as JSON:
   "metadata": {{
     "response_quality": "high/medium/low",
     "contradictions": ["any conflicting signals"],
-    "strong_signals": ["notably clear indicators"]
+    "strong_signals": ["notably clear indicators (motivators or interests)"]
   }}
 }}
 
-Be thorough but only include dimensions with actual evidence from the response."""
+Only include items with clear supporting evidence."""
         else:
             prompt = f"""Analyze this response for career alignment indicators:
 
@@ -112,38 +94,20 @@ User Response: "{response_text}"
 
 Extract signals for:
 
-1. RIASEC Dimensions (rate 0-10 for strength, 0-100 for confidence):
-   - Realistic: hands-on, practical, physical activities, tools, outdoors
-   - Investigative: analytical, intellectual, research, problem-solving, science
-   - Artistic: creative, expressive, innovative, design, unstructured
-   - Social: helping, teaching, collaborating, interpersonal, service
-   - Enterprising: leading, persuading, business, sales, risk-taking
-   - Conventional: organizing, structured, detail-oriented, procedures, data
-
-2. Career Motivators (identify any clearly present):
+1. Career Motivators (identify any clearly present from this list):
    {', '.join(self.motivator_types)}
 
-3. Interests: Specific activities, subjects, skills, or domains mentioned
+   - For each motivator found, provide: type, strength (1-10), and a brief evidence quote.
 
-Analyze both explicit statements and implicit indicators. Look for:
-- Direct preferences stated
-- Emotional language indicating enthusiasm or aversion
-- Examples or stories that reveal values
-- Problem-solving approaches mentioned
-- Work style preferences implied
+2. Interests: Specific activities, subjects, skills, or domains mentioned
+   - For each interest, provide: category, specific (short phrase), and enthusiasm (1-10).
+
+Analyze explicit statements and implicit indicators (values, emotions, examples, work style).
 
 Output as JSON:
 {{
-  "riasec": {{
-    "realistic": {{"score": 0-10, "confidence": 0-100, "evidence": "quote from response"}},
-    "investigative": {{"score": 0-10, "confidence": 0-100, "evidence": "quote"}},
-    "artistic": {{"score": 0-10, "confidence": 0-100, "evidence": "quote"}},
-    "social": {{"score": 0-10, "confidence": 0-100, "evidence": "quote"}},
-    "enterprising": {{"score": 0-10, "confidence": 0-100, "evidence": "quote"}},
-    "conventional": {{"score": 0-10, "confidence": 0-100, "evidence": "quote"}}
-  }},
   "motivators": [
-    {{"type": "motivator name", "strength": 1-10, "evidence": "quote"}}
+    {{"type": "motivator name", "strength": 1-10, "evidence": "short quote"}}
   ],
   "interests": [
     {{"category": "technology/arts/business/science/etc", "specific": "detailed interest", "enthusiasm": 1-10}}
@@ -151,25 +115,15 @@ Output as JSON:
   "metadata": {{
     "response_quality": "high/medium/low",
     "contradictions": ["any conflicting signals"],
-    "strong_signals": ["notably clear indicators"]
+    "strong_signals": ["notably clear indicators (motivators or interests)"]
   }}
 }}
 
-Be thorough but only include dimensions with actual evidence from the response."""
+Only include items with clear supporting evidence."""
         
         return prompt
     
     def _process_analysis_result(self, result: Dict[str, Any]) -> ResponseAnalysis:
-        # Process RIASEC signals
-        riasec_signals = {}
-        for dimension, data in result.get("riasec", {}).items():
-            if data.get("score", 0) > 0:  # Only include dimensions with evidence
-                riasec_signals[dimension] = {
-                    "score": data.get("score", 0),
-                    "confidence": data.get("confidence", 0),
-                    "evidence": data.get("evidence", "")
-                }
-        
         # Process motivators
         motivators = []
         for motivator_data in result.get("motivators", []):
@@ -184,16 +138,15 @@ Be thorough but only include dimensions with actual evidence from the response."
         interests = []
         for interest_data in result.get("interests", []):
             interests.append(Interest(
-                category=interest_data["category"],
-                specific=interest_data["specific"],
-                enthusiasm=interest_data["enthusiasm"]
+                category=interest_data.get("category") or interest_data.get("area"),
+                specific=interest_data.get("specific"),
+                enthusiasm=interest_data.get("enthusiasm")
             ))
         
         # Get metadata
         metadata = result.get("metadata", {})
         
         return ResponseAnalysis(
-            riasec_signals=riasec_signals,
             motivators=motivators,
             interests=interests,
             response_quality=metadata.get("response_quality", "medium"),
@@ -217,7 +170,6 @@ Be thorough but only include dimensions with actual evidence from the response."
     
     def _create_skipped_analysis(self) -> ResponseAnalysis:
         return ResponseAnalysis(
-            riasec_signals={},
             motivators=[],
             interests=[],
             response_quality="low",
@@ -236,17 +188,6 @@ Be thorough but only include dimensions with actual evidence from the response."
             return self._create_skipped_analysis()
         
         selected_option = question.options[option_index]
-        
-        # Extract RIASEC signals from option metadata
-        riasec_signals = {}
-        if selected_option.riasec_weights:
-            for dimension, weight in selected_option.riasec_weights.items():
-                if weight > 0:
-                    riasec_signals[dimension.lower()] = {
-                        'score': weight,
-                        'confidence': min(weight * 10 + 20, 90),  # Convert weight to confidence
-                        'evidence': f"Selected option emphasizing {dimension} traits"
-                    }
         
         # Extract motivators from option metadata (list of dicts)
         motivators = []
@@ -267,28 +208,31 @@ Be thorough but only include dimensions with actual evidence from the response."
         if selected_option.interests:
             for interest_dict in selected_option.interests:
                 # Handle dict format: {area: "technology", weight: 0.6}
-                interest_area = interest_dict.get('area', 'Unknown')
+                interest_area = interest_dict.get('category') or interest_dict.get('area', 'Unknown')
                 interest_weight = interest_dict.get('weight', 0.5)
                 interests.append(Interest(
                     category=interest_area,
-                    enthusiasm=interest_weight * 10,  # Convert 0-1 to 0-10 scale
-                    specific_topics=[interest_area],
-                    evidence=f"Selected option related to {interest_area}"
+                    specific=interest_dict.get('specific') or f"General interest in {interest_area}",
+                    enthusiasm=interest_weight * 10  # Convert 0-1 to 0-10 scale
                 ))
         
-        # Determine strong signals based on highest RIASEC weights
+        # Determine strong signals based on highest motivator strength and interest enthusiasm
         strong_signals = []
-        if riasec_signals:
-            sorted_signals = sorted(riasec_signals.items(), key=lambda x: x[1]['score'], reverse=True)
-            for dimension, data in sorted_signals[:2]:  # Top 2 signals
-                if data['score'] >= 7:
-                    strong_signals.append(dimension.capitalize())
+        if motivators:
+            top_motivators = sorted(motivators, key=lambda m: m.strength, reverse=True)[:2]
+            for m in top_motivators:
+                if m.strength >= 7:
+                    strong_signals.append(m.type)
+        if interests and len(strong_signals) < 2:
+            top_interests = sorted(interests, key=lambda i: (i.enthusiasm or 0), reverse=True)[:2]
+            for i in top_interests:
+                if (i.enthusiasm or 0) >= 7:
+                    strong_signals.append(i.category or (i.specific or "interest"))
         
         return ResponseAnalysis(
-            riasec_signals=riasec_signals,
             motivators=motivators,
             interests=interests,
-            response_quality="high" if riasec_signals else "medium",
+            response_quality="high" if (motivators or interests) else "medium",
             contradictions=[],
             strong_signals=strong_signals
         )

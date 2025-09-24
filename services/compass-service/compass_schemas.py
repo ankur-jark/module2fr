@@ -48,22 +48,6 @@ class JourneyInitRequest(BaseModel):
     demographics: UserDemographics
     preferences: UserPreferences = Field(default_factory=UserPreferences)
 
-class RIASECScore(BaseModel):
-    realistic: float = Field(default=0.0, ge=0, le=100)
-    investigative: float = Field(default=0.0, ge=0, le=100)
-    artistic: float = Field(default=0.0, ge=0, le=100)
-    social: float = Field(default=0.0, ge=0, le=100)
-    enterprising: float = Field(default=0.0, ge=0, le=100)
-    conventional: float = Field(default=0.0, ge=0, le=100)
-
-class RIASECConfidence(BaseModel):
-    realistic: float = Field(default=0.0, ge=0, le=100)
-    investigative: float = Field(default=0.0, ge=0, le=100)
-    artistic: float = Field(default=0.0, ge=0, le=100)
-    social: float = Field(default=0.0, ge=0, le=100)
-    enterprising: float = Field(default=0.0, ge=0, le=100)
-    conventional: float = Field(default=0.0, ge=0, le=100)
-
 class CareerMotivator(BaseModel):
     type: str
     strength: float = Field(ge=1, le=10)
@@ -94,7 +78,6 @@ class QuestionTarget(BaseModel):
 class OptionTarget(BaseModel):
     id: str  # A, B, C, D
     text: str
-    riasec_weights: Dict[str, float] = Field(default_factory=dict)  # realistic: 0.8, etc
     motivators: List[Dict[str, Any]] = Field(default_factory=list)  # [{type: "autonomy", weight: 0.7}]
     interests: List[Dict[str, Any]] = Field(default_factory=list)  # [{area: "technology", weight: 0.6}]
     confidence_impact: float = Field(default=0.0)  # How much this clarifies understanding
@@ -116,7 +99,6 @@ class UserResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 class ResponseAnalysis(BaseModel):
-    riasec_signals: Dict[str, Dict[str, Any]]
     motivators: List[CareerMotivator]
     interests: List[Interest]
     response_quality: Literal["high", "medium", "low"]
@@ -124,7 +106,6 @@ class ResponseAnalysis(BaseModel):
     strong_signals: List[str] = Field(default_factory=list)
 
 class ConfidenceScore(BaseModel):
-    riasec_confidence: RIASECConfidence
     motivator_confidence: float = Field(ge=0, le=100)
     interest_confidence: float = Field(ge=0, le=100)
     overall_confidence: float = Field(ge=0, le=100)
@@ -148,8 +129,6 @@ class ProfileInsights(BaseModel):
 class CompletedProfile(BaseModel):
     user_id: str
     journey_id: str
-    riasec_profile: RIASECScore
-    riasec_code: str  # e.g., "RIA"
     motivators: Dict[str, List[str]]  # {"top": [...], "moderate": [...], "low": [...]}
     interests: Dict[str, List[str]]  # {"primary": [...], "secondary": [...], "emerging": [...]}
     insights: ProfileInsights
@@ -168,7 +147,6 @@ class JourneyState(BaseModel):
     questions_asked: List[GeneratedQuestion] = Field(default_factory=list)
     responses: List[UserResponse] = Field(default_factory=list)
     analyses: List[ResponseAnalysis] = Field(default_factory=list)
-    current_profile: RIASECScore = Field(default_factory=RIASECScore)
     current_confidence: Optional[ConfidenceScore] = None
     identified_motivators: List[CareerMotivator] = Field(default_factory=list)
     identified_interests: List[Interest] = Field(default_factory=list)

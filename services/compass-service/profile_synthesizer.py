@@ -6,7 +6,6 @@ from openai import AsyncOpenAI
 from compass_schemas import (
     CompletedProfile,
     ProfileInsights,
-    RIASECScore,
     JourneyState,
     ResponseAnalysis
 )
@@ -17,9 +16,6 @@ class ProfileSynthesizerService:
         self.model = "gpt-4-turbo-preview"
         
     async def synthesize_profile(self, journey_state: JourneyState) -> CompletedProfile:
-        # Calculate final RIASEC scores
-        riasec_score, riasec_code = self._calculate_final_riasec(journey_state.analyses)
-        
         # Organize motivators by priority
         motivators = self._organize_motivators(journey_state.analyses)
         
@@ -28,8 +24,6 @@ class ProfileSynthesizerService:
         
         # Generate insights using GPT-4
         insights = await self._generate_insights(
-            riasec_score,
-            riasec_code,
             motivators,
             interests,
             journey_state
@@ -41,8 +35,6 @@ class ProfileSynthesizerService:
         return CompletedProfile(
             user_id=journey_state.user_id,
             journey_id=journey_state.journey_id,
-            riasec_profile=riasec_score,
-            riasec_code=riasec_code,
             motivators=motivators,
             interests=interests,
             insights=insights,
@@ -51,58 +43,6 @@ class ProfileSynthesizerService:
             journey_duration_minutes=journey_duration,
             confidence_at_completion=journey_state.current_confidence.overall_confidence if journey_state.current_confidence else 0
         )
-    
-    def _calculate_final_riasec(self, analyses: List[ResponseAnalysis]) -> Tuple[RIASECScore, str]:
-        dimensions = ['realistic', 'investigative', 'artistic', 'social', 'enterprising', 'conventional']
-        final_scores = {}
-        
-        for dimension in dimensions:
-            scores = []
-            weights = []
-            
-            for i, analysis in enumerate(analyses):
-                if dimension in analysis.riasec_signals:
-                    signal = analysis.riasec_signals[dimension]
-                    scores.append(signal['score'])
-                    
-                    # Weight based on recency and confidence
-                    recency_weight = 1.0 + (i / len(analyses)) * 0.5
-                    confidence_weight = signal['confidence'] / 100
-                    quality_weight = 1.5 if analysis.response_quality == 'high' else 1.0
-                    
-                    weight = recency_weight * confidence_weight * quality_weight
-                    weights.append(weight)
-            
-            if scores:
-                # Weighted average, normalized to 0-100
-                weighted_score = np.average(scores, weights=weights) * 10
-                final_scores[dimension] = min(weighted_score, 100)
-            else:
-                final_scores[dimension] = 0
-        
-        # Create RIASECScore object
-        riasec_score = RIASECScore(
-            realistic=final_scores['realistic'],
-            investigative=final_scores['investigative'],
-            artistic=final_scores['artistic'],
-            social=final_scores['social'],
-            enterprising=final_scores['enterprising'],
-            conventional=final_scores['conventional']
-        )
-        
-        # Generate Holland code (top 3 dimensions)
-        sorted_dims = sorted(final_scores.items(), key=lambda x: x[1], reverse=True)
-        code_map = {
-            'realistic': 'R',
-            'investigative': 'I',
-            'artistic': 'A',
-            'social': 'S',
-            'enterprising': 'E',
-            'conventional': 'C'
-        }
-        riasec_code = ''.join([code_map[dim[0]] for dim in sorted_dims[:3]])
-        
-        return riasec_score, riasec_code
     
     def _organize_motivators(self, analyses: List[ResponseAnalysis]) -> Dict[str, List[str]]:
         # Aggregate all motivator signals
@@ -183,8 +123,6 @@ class ProfileSynthesizerService:
     
     async def _generate_insights(
         self,
-        riasec_score: RIASECScore,
-        riasec_code: str,
         motivators: Dict[str, List[str]],
         interests: Dict[str, List[str]],
         journey_state: JourneyState
@@ -192,8 +130,6 @@ class ProfileSynthesizerService:
         
         # Prepare context for GPT-4
         prompt = self._build_insights_prompt(
-            riasec_score,
-            riasec_code,
             motivators,
             interests,
             journey_state
@@ -222,22 +158,12 @@ class ProfileSynthesizerService:
     
     def _build_insights_prompt(
         self,
-        riasec_score: RIASECScore,
-        riasec_code: str,
         motivators: Dict[str, List[str]],
         interests: Dict[str, List[str]],
         journey_state: JourneyState
     ) -> str:
         
         prompt = f"""Synthesize a comprehensive career profile based on this assessment data:
-
-RIASEC Profile: {riasec_code}
-- Realistic: {riasec_score.realistic:.0f}%
-- Investigative: {riasec_score.investigative:.0f}%
-- Artistic: {riasec_score.artistic:.0f}%
-- Social: {riasec_score.social:.0f}%
-- Enterprising: {riasec_score.enterprising:.0f}%
-- Conventional: {riasec_score.conventional:.0f}%
 
 Top Career Motivators: {', '.join(motivators.get('top', []))}
 Moderate Motivators: {', '.join(motivators.get('moderate', []))}
@@ -266,7 +192,7 @@ Output as JSON:
   "potential_blind_spots": ["blind spot 1", "blind spot 2"]
 }}
 
-Make insights specific to their profile, not generic. Reference their actual scores and preferences."""
+Make insights specific to their profile, not generic. Reference their actual motivators and interests."""
         
         return prompt
     

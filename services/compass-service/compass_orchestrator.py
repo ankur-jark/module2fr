@@ -15,7 +15,6 @@ from compass_schemas import (
     JourneyDecision,
     DecisionType,
     CompletedProfile,
-    RIASECScore,
     ConfidenceScore
 )
 from question_generator import QuestionGeneratorService
@@ -232,7 +231,7 @@ class CompassOrchestrator:
     async def update_journey_profile(
         self,
         journey_id: str,
-        profile_update: Optional[RIASECScore] = None,
+        profile_update: Optional[object] = None,
         confidence_update: Optional[ConfidenceScore] = None
     ) -> JourneyState:
         """Update journey profile and confidence values"""
@@ -240,9 +239,7 @@ class CompassOrchestrator:
         if not journey_state:
             raise ValueError(f"Journey {journey_id} not found")
         
-        # Update profile if provided
-        if profile_update:
-            journey_state.current_profile = profile_update
+        # RAISEC profile updates are no longer tracked in orchestrator
         
         # Update confidence if provided
         if confidence_update:
@@ -254,11 +251,10 @@ class CompassOrchestrator:
         # Save updated state
         await self._save_journey_state(journey_state)
         
-        # Publish event
+        # Publish event without RAISEC-specific flags
         await self._publish_event("profile.updated", {
             "journey_id": journey_id,
             "user_id": journey_state.user_id,
-            "profile_updated": profile_update is not None,
             "confidence_updated": confidence_update is not None
         })
         
@@ -267,23 +263,6 @@ class CompassOrchestrator:
     # Private helper methods
     
     def _update_current_profile(self, journey_state: JourneyState):
-        # Aggregate RIASEC scores from all analyses
-        dimensions = ['realistic', 'investigative', 'artistic', 'social', 'enterprising', 'conventional']
-        aggregated_scores = {dim: [] for dim in dimensions}
-        
-        for analysis in journey_state.analyses:
-            for dim in dimensions:
-                if dim in analysis.riasec_signals:
-                    score = analysis.riasec_signals[dim]['score']
-                    aggregated_scores[dim].append(score)
-        
-        # Calculate averages
-        for dim in dimensions:
-            scores = aggregated_scores[dim]
-            if scores:
-                avg_score = sum(scores) / len(scores) * 10  # Scale to 0-100
-                setattr(journey_state.current_profile, dim, min(avg_score, 100))
-        
         # Aggregate motivators (store the most recent ones with highest strength)
         all_motivators = []
         for analysis in journey_state.analyses:
@@ -330,7 +309,6 @@ class CompassOrchestrator:
         await self._publish_event("journey.completed", {
             "journey_id": journey_state.journey_id,
             "user_id": journey_state.user_id,
-            "riasec_code": completed_profile.riasec_code,
             "confidence": completed_profile.confidence_at_completion,
             "duration_minutes": completed_profile.journey_duration_minutes
         })
