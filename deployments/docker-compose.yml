@@ -1,0 +1,79 @@
+services:
+  # Redis for caching and future message broker
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - truscholar-network
+    restart: unless-stopped
+
+  # API Gateway - Main entry point
+  api-gateway:
+    build:
+      context: ../services
+      dockerfile: api-gateway/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GATEWAY_HOST=api-gateway
+      - GATEWAY_PORT=8000
+      - CORS_ORIGINS=http://localhost:3000
+    depends_on:
+      - redis
+    networks:
+      - truscholar-network
+    volumes:
+      - ../services/shared:/app/shared:ro
+    restart: unless-stopped
+
+  # Compass Service - The only active module for now
+  compass-service:
+    build:
+      context: ../services
+      dockerfile: compass-service/Dockerfile
+    ports:
+      - "8001:8001"  # Internal port, accessed via gateway
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COMPASS_HOST=compass-service
+      - COMPASS_PORT=8001
+    depends_on:
+      - redis
+      - api-gateway
+    networks:
+      - truscholar-network
+    volumes:
+      - ../services/shared:/app/shared:ro
+    restart: unless-stopped
+
+  # Profile Service - Lightweight for now, ready for future modules
+  user-profile-service:
+    build:
+      context: ../services
+      dockerfile: user-profile-service/Dockerfile
+    ports:
+      - "8002:8002"  # Internal port
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - PROFILE_HOST=user-profile-service
+      - PROFILE_PORT=8002
+    depends_on:
+      - redis
+      - api-gateway
+    networks:
+      - truscholar-network
+    volumes:
+      - ../services/shared:/app/shared:ro
+    restart: unless-stopped
+
+networks:
+  truscholar-network:
+    driver: bridge
+
+volumes:
+  redis_data:
