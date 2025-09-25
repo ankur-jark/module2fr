@@ -48,13 +48,15 @@ export default function ConfidenceMeter({ confidence }: Props) {
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-gray-600">RIASEC</span>
             <span className="text-xs font-medium">
-              {confidence ? `${Object.values(confidence.riasec_confidence).reduce((a, b) => a + b, 0) / 6}`.slice(0, 4) : '0'}%
+              {confidence && confidence.riasec_confidence
+                ? `${Object.values(confidence.riasec_confidence).reduce((a, b) => a + b, 0) / 6}`.slice(0, 4)
+                : '0'}%
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1.5">
             <div 
               className="bg-purple-600 h-1.5 rounded-full transition-all duration-500"
-              style={{ width: `${confidence ? Object.values(confidence.riasec_confidence).reduce((a, b) => a + b, 0) / 6 : 0}%` }}
+              style={{ width: `${confidence && confidence.riasec_confidence ? Object.values(confidence.riasec_confidence).reduce((a, b) => a + b, 0) / 6 : 0}%` }}
             />
           </div>
         </div>
@@ -107,7 +109,7 @@ export default function ConfidenceMeter({ confidence }: Props) {
             )}
           </div>
           
-          {confidence.gaps_remaining.length > 0 && (
+          {Array.isArray(confidence.gaps_remaining) && confidence.gaps_remaining.length > 0 && (
             <div className="mt-2">
               <p className="text-xs text-gray-600 mb-1">Gaps remaining:</p>
               <ul className="text-xs text-gray-500 space-y-0.5">

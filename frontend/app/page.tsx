@@ -28,6 +28,7 @@ export default function DemoPage() {
   const [userResponses, setUserResponses] = useState<UserResponse[]>([])
   const [finalResult, setFinalResult] = useState<any>(null)
   const [fetchError, setFetchError] = useState<string|null>(null)
+  const [contextStatus, setContextStatus] = useState<string|undefined>(undefined)
   const router = useRouter()
   
   const currentQuestion = mockQuestionsWithMetadata[currentQuestionIndex]
@@ -173,6 +174,43 @@ export default function DemoPage() {
     }
   }
 
+  // Package journeyState and module2UpdateProfilePayload from localStorage
+  // and send to context generator service, then store response back
+  const handleGenerateContext = async () => {
+    try {
+      setContextStatus('Preparing payload...')
+      const journeyStateRaw = typeof window !== 'undefined' ? localStorage.getItem('journeyState') : null
+      const updatePayloadRaw = typeof window !== 'undefined' ? localStorage.getItem('module2UpdateProfilePayload') : null
+
+      const journeyState = journeyStateRaw ? JSON.parse(journeyStateRaw) : null
+      const module2UpdateProfilePayload = updatePayloadRaw ? JSON.parse(updatePayloadRaw) : null
+
+      const payload = {
+        journeyState,
+        module2UpdateProfilePayload,
+        sentAt: Date.now()
+      }
+
+      setContextStatus('Contacting context generator...')
+      const resp = await fetch('http://localhost:8004/contextgenerator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`)
+      }
+
+      const result = await resp.json()
+      const stored = { result, receivedAt: Date.now() }
+      localStorage.setItem('contextGeneratorResult', JSON.stringify(stored))
+      setContextStatus('Context generated and saved to localStorage as "contextGeneratorResult"')
+    } catch (e: any) {
+      setContextStatus(`Failed to generate context: ${e?.message || 'unknown error'}`)
+    }
+  }
+
   // Helper function to generate a summary of responses
   const generateSummary = (responses: UserResponse[]) => {
     // Calculate average RIASEC scores, etc.
@@ -296,6 +334,17 @@ export default function DemoPage() {
               <summary className="cursor-pointer">View Response Data</summary>
               <pre className="mt-2 whitespace-pre-wrap">{JSON.stringify(userResponses, null, 2)}</pre>
             </details>
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                onClick={handleGenerateContext}
+                className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Generate Context (POST to :8004/contextgenerator)
+              </button>
+              {contextStatus && (
+                <span className="text-[11px] text-gray-700">{contextStatus}</span>
+              )}
+            </div>
           </div>
         </div>
 

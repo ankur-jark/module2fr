@@ -23,9 +23,11 @@ export default function JourneyControl({
   const [journeyId, setJourneyId] = useState<string>('')
   const [userId] = useState(`test_user_${Date.now()}`)
   const [age, setAge] = useState(25)
+  const [loadingMessage, setLoadingMessage] = useState<string>('')
   
   const startJourney = async () => {
     setIsLoading(true)
+    setLoadingMessage('Starting journey...')
     try {
       const response = await axios.post('http://localhost:8000/api/v1/compass/start', {
         user_id: userId,
@@ -58,11 +60,14 @@ export default function JourneyControl({
       })
     } finally {
       setIsLoading(false)
+      setLoadingMessage('')
     }
   }
   
   const getNextQuestion = async (jId: string) => {
     try {
+      setIsLoading(true)
+      setLoadingMessage('Generating next question...')
       const response = await axios.post(
         `http://localhost:8000/api/v1/compass/journey/${jId}/next-question`
       )
@@ -82,6 +87,9 @@ export default function JourneyControl({
       })
     } catch (error) {
       console.error('Failed to get next question:', error)
+    } finally {
+      setIsLoading(false)
+      setLoadingMessage('')
     }
   }
   
@@ -119,12 +127,15 @@ export default function JourneyControl({
         const refreshed = await fetch(`http://localhost:8000/api/v1/compass/journey/${journeyId}`)
         if (!refreshed.ok) throw new Error(`HTTP ${refreshed.status}`)
         const refreshedState = await refreshed.json()
-        onJourneyUpdate({
+        const mergedState = {
           ...refreshedState,
           // Preserve the active question in UI so the loop isn't interrupted
           current_question: currentJourneyState?.current_question,
-          current_question_number: currentJourneyState?.current_question_number ?? refreshedState.current_question_number
-        })
+          current_question_number: currentJourneyState?.current_question_number ?? refreshedState.current_question_number,
+          // Ensure RIASEC metrics reflect Module 2 payload immediately
+          current_profile: refreshedState.current_profile ?? payload.current_profile
+        }
+        onJourneyUpdate(mergedState)
       } catch (refreshErr) {
         console.error('Failed to refresh journey after profile update:', refreshErr)
       }
@@ -177,6 +188,13 @@ export default function JourneyControl({
             max="80"
           />
         </div>
+        
+        {isLoading && (
+          <div className="flex items-center gap-2 text-sm text-gray-700">
+            <div className="h-4 w-4 rounded-full border-2 border-gray-300 border-t-blue-600 animate-spin" />
+            <span>{loadingMessage || 'Loading...'}</span>
+          </div>
+        )}
         
         {/* Control Buttons */}
         <div className="flex gap-2">

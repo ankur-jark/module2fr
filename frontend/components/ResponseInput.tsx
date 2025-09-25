@@ -72,7 +72,26 @@ export default function ResponseInput({
         `http://localhost:8000/api/v1/compass/journey/${journeyState.journey_id}`
       )
       
-      onJourneyUpdate(journeyResponse.data)
+      // Always preserve/override current_profile with local storage payload
+      const getLocalModule2Profile = (): any | undefined => {
+        try {
+          const stored = localStorage.getItem('module2UpdateProfilePayload')
+          if (!stored) return undefined
+          const parsed = JSON.parse(stored)
+          // Handle double-encoded strings defensively
+          if (typeof parsed === 'string') {
+            try { return JSON.parse(parsed)?.current_profile } catch { return undefined }
+          }
+          return parsed?.current_profile
+        } catch {
+          return undefined
+        }
+      }
+      const localProfile = getLocalModule2Profile()
+      onJourneyUpdate({
+        ...journeyResponse.data,
+        current_profile: localProfile ?? journeyResponse.data.current_profile ?? journeyState.current_profile
+      })
       
       // Check decision and get next question if continuing
       if (decision.decision === 'continue' || decision.decision === 'clarify') {
@@ -84,10 +103,12 @@ export default function ResponseInput({
           `http://localhost:8000/api/v1/compass/journey/${journeyState.journey_id}`
         )
         
+        const localProfile2 = localProfile ?? getLocalModule2Profile()
         onJourneyUpdate({
           ...updatedJourney.data,
           current_question: nextQuestion.data,
-          last_decision: decision
+          last_decision: decision,
+          current_profile: localProfile2 ?? updatedJourney.data.current_profile ?? journeyState.current_profile
         })
         
         // Reset for next question
